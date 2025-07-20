@@ -1,6 +1,8 @@
-# 🏟️ Fantasy Sumo Draft
+# Fantasy Sumo Draft
 
-A beautiful, interactive fantasy sumo drafting app where users can draft their favorite rikishi with a 100-point budget system.
+A fantasy sports application for sumo wrestling.
+
+<!-- Deployment: Updated Vercel config for faster builds -->
 
 ## ✨ Features
 
