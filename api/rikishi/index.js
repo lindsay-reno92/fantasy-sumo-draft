@@ -29,16 +29,27 @@ module.exports = async (req, res) => {
   }
 
   try {
+    console.log('Fetching rikishi data for user:', sessionData.userId);
+    
     // Get rikishi data with selections from Supabase
     const groupedRikishi = await supabaseQueries.getRikishiWithSelections(sessionData.userId);
 
+    console.log('Successfully loaded rikishi data:', Object.keys(groupedRikishi));
     res.json(groupedRikishi);
     
   } catch (error) {
-    console.error('Error loading rikishi data:', error);
+    console.error('Error loading rikishi data:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      stack: error.stack
+    });
     res.status(500).json({ 
       error: 'Failed to load rikishi data',
-      details: error.message
+      details: error.message,
+      code: error.code,
+      hint: error.hint
     });
   }
 }; 
