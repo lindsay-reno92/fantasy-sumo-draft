@@ -37,13 +37,28 @@ module.exports = async (req, res) => {
 
   try {
     // Get fresh user data from Supabase
-    const { data: user, error } = await supabaseQueries.getUser(sessionData.sumoName);
+    let { data: user, error } = await supabaseQueries.getUser(sessionData.sumoName);
 
     console.log('User lookup result:', { 
       found: !!user, 
       error: error?.message,
       searchedFor: sessionData.sumoName 
     });
+
+    // If user doesn't exist in database but has valid session, 
+    // create the user (this handles the case where session exists but DB user creation failed)
+    if (!user && !error) {
+      console.log('User not found in DB, attempting to create:', sessionData.sumoName);
+      const { data: newUser, error: createError } = await supabaseQueries.createUser(sessionData.sumoName);
+      
+      if (createError) {
+        console.error('Failed to create missing user:', createError);
+        return res.status(500).json({ error: 'User creation failed' });
+      }
+      
+      // Use the newly created user
+      user = newUser;
+    }
 
     if (error || !user) {
       console.error('User lookup error:', error);
