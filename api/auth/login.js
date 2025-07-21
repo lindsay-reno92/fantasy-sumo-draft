@@ -29,8 +29,21 @@ module.exports = async (req, res) => {
     const { data: user, error } = await supabaseQueries.createUser(trimmedName);
 
     if (error) {
-      console.error('User creation error:', error);
-      return res.status(500).json({ error: 'Failed to create or get user' });
+      console.error('User creation error details:', {
+        error: error,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      return res.status(500).json({ 
+        error: 'Failed to create or get user',
+        debug: {
+          message: error.message,
+          code: error.code,
+          hint: error.hint
+        }
+      });
     }
 
     // Create session data
