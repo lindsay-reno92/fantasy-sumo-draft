@@ -1,7 +1,7 @@
 {
-  "buildCommand": "echo '[BUILD START] Starting build at:' && date && echo '[BUILD] Installing client dependencies...' && cd client && npm ci --audit=false --silent && echo '[BUILD] Client deps installed at:' && date && echo '[BUILD] Building React app...' && npm run build && echo '[BUILD] Build completed at:' && date",
+  "buildCommand": "echo 'BUILD START' && date && cd client && npm ci --audit=false --silent && echo 'DEPS DONE' && date && npm run build && echo 'BUILD DONE' && date",
   "outputDirectory": "client/build",
-  "installCommand": "echo '[INSTALL START] Starting install at:' && date && echo '[INSTALL] Installing root dependencies...' && npm install --audit=false --silent && echo '[INSTALL] Root deps done at:' && date && echo '[INSTALL] Installing client dependencies...' && cd client && npm install --audit=false --silent && echo '[INSTALL COMPLETE] All installs done at:' && date",
+  "installCommand": "echo 'INSTALL START' && date && npm install --audit=false --silent && cd client && npm install --audit=false --silent && echo 'INSTALL DONE' && date",
   "env": {
     "NPM_CONFIG_AUDIT": "false",
     "NPM_CONFIG_FUND": "false",
