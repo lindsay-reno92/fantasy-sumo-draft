@@ -1,52 +1,85 @@
-const { getDatabase } = require('../_db');
-const { requireAuth, requireAdmin, setCorsHeaders } = require('../_session');
+const cookie = require('cookie');
+const { verifySession } = require('../_session-store');
+const { supabaseQueries } = require('../../lib/supabase');
 
-module.exports = (req, res) => {
-  setCorsHeaders(req, res);
+// Get the supabase client directly since it's not exported as supabaseServer
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+// Session helper
+function requireAuth(req) {
+  const cookies = cookie.parse(req.headers.cookie || '');
+  return verifySession(cookies.session);
+}
+
+// Admin check helper
+function requireAdmin(sessionData) {
+  return sessionData && sessionData.isAdmin;
+}
+
+module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   // Check authentication
-  const sessionData = requireAuth(req, res);
-  if (!sessionData) return; // requireAuth already sent the response
+  const sessionData = requireAuth(req);
+  if (!sessionData) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
 
-  const rikishiId = req.query.id;
+  const rikishiId = parseInt(req.query.id);
 
   if (req.method === 'GET') {
     // Get individual rikishi details
-    const db = getDatabase();
-    
-    const query = `
-      SELECT r.*, 
-             ds.user_id as selected_by_user
-      FROM rikishi r
-      LEFT JOIN draft_selections ds ON r.id = ds.rikishi_id AND ds.user_id = ?
-      WHERE r.id = ?
-    `;
+    try {
+      const { data: rikishi, error } = await supabase
+        .from('rikishi')
+        .select(`
+          *,
+          draft_selections!inner(user_id)
+        `)
+        .eq('id', rikishiId)
+        .eq('draft_selections.user_id', sessionData.userId)
+        .single();
 
-    db.get(query, [sessionData.userId, rikishiId], (err, rikishi) => {
-      if (err) {
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+        console.error('Error fetching rikishi:', error);
         return res.status(500).json({ error: 'Database error' });
       }
 
       if (!rikishi) {
-        return res.status(404).json({ error: 'Rikishi not found' });
+        // Try to get rikishi without selection info
+        const { data: rikishiData, error: rikishiError } = await supabase
+          .from('rikishi')
+          .select('*')
+          .eq('id', rikishiId)
+          .single();
+
+        if (rikishiError) {
+          return res.status(404).json({ error: 'Rikishi not found' });
+        }
+
+        res.json({ ...rikishiData, isSelected: false });
+      } else {
+        res.json({ ...rikishi, isSelected: true });
       }
 
-      const result = {
-        ...rikishi,
-        isSelected: !!rikishi.selected_by_user
-      };
-      delete result.selected_by_user;
-
-      res.json(result);
-    });
+    } catch (error) {
+      console.error('Error in GET /api/rikishi/[id]:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
 
   } else if (req.method === 'PUT') {
     // Update rikishi draft value (admin only)
-    if (!requireAdmin(req, res)) return; // requireAdmin already sent the response
+    if (!requireAdmin(sessionData)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
 
     const { draftValue } = req.body;
 
@@ -54,14 +87,20 @@ module.exports = (req, res) => {
       return res.status(400).json({ error: 'Draft value must be between 1 and 20' });
     }
 
-    const db = getDatabase();
-    const query = 'UPDATE rikishi SET draft_value = ? WHERE id = ?';
-    db.run(query, [draftValue, rikishiId], function(err) {
-      if (err) {
+    try {
+      const { data, error } = await supabase
+        .from('rikishi')
+        .update({ draft_value: draftValue })
+        .eq('id', rikishiId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating rikishi:', error);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      if (this.changes === 0) {
+      if (!data) {
         return res.status(404).json({ error: 'Rikishi not found' });
       }
 
@@ -70,7 +109,11 @@ module.exports = (req, res) => {
         rikishiId: parseInt(rikishiId),
         newValue: draftValue
       });
-    });
+
+    } catch (error) {
+      console.error('Error in PUT /api/rikishi/[id]:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
 
   } else {
     return res.status(405).json({ error: 'Method not allowed' });
