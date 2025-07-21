@@ -25,8 +25,17 @@ module.exports = async (req, res) => {
   const trimmedName = sumoName.trim();
 
   try {
+    console.log('Attempting to create/find user with name:', trimmedName);
+    
     // Create or get user from Supabase
     const { data: user, error } = await supabaseQueries.createUser(trimmedName);
+
+    console.log('User creation/lookup result:', {
+      found: !!user,
+      userId: user?.id,
+      sumoName: user?.sumo_name,
+      error: error?.message
+    });
 
     if (error) {
       console.error('User creation error details:', {

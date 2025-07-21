@@ -25,12 +25,25 @@ module.exports = async (req, res) => {
   // Check authentication
   const sessionData = requireAuth(req);
   if (!sessionData) {
+    console.log('Session verification failed - no session data');
     return res.status(401).json({ error: 'Not authenticated' });
   }
+
+  console.log('Session data found:', { 
+    userId: sessionData.userId, 
+    sumoName: sessionData.sumoName,
+    sessionKeys: Object.keys(sessionData)
+  });
 
   try {
     // Get fresh user data from Supabase
     const { data: user, error } = await supabaseQueries.getUser(sessionData.sumoName);
+
+    console.log('User lookup result:', { 
+      found: !!user, 
+      error: error?.message,
+      searchedFor: sessionData.sumoName 
+    });
 
     if (error || !user) {
       console.error('User lookup error:', error);
