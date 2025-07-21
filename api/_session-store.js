@@ -9,6 +9,11 @@ function createSession(data) {
   return `${payload}.${signature}`;
 }
 
+// Alias for createSession (used by login endpoint)
+function signSession(data) {
+  return createSession(data);
+}
+
 // Verify and decode session data
 function verifySession(sessionCookie) {
   if (!sessionCookie) return null;
@@ -87,6 +92,7 @@ function removeSelectionFromSession(sessionCookie, rikishiId) {
 
 module.exports = {
   createSession,
+  signSession,
   verifySession,
   updateSession,
   addSelectionToSession,
