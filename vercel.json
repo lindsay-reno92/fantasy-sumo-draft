@@ -1,5 +1,9 @@
 {
-  "buildCommand": "cd client && npm install && npm run build",
+  "buildCommand": "cd client && npm ci --audit=false && npm run build",
   "outputDirectory": "client/build",
-  "installCommand": "npm install && cd client && npm install"
+  "installCommand": "npm install --audit=false && cd client && npm install --audit=false",
+  "env": {
+    "NPM_CONFIG_AUDIT": "false",
+    "NPM_CONFIG_FUND": "false"
+  }
 } 
