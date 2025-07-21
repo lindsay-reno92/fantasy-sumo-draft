@@ -61,6 +61,9 @@ create policy "Users can update their own record" on users for update to anon, a
 -- Rikishi policies (read-only for regular users)
 create policy "Anyone can view rikishi" on rikishi for select to anon, authenticated using (true);
 
+-- Admin users can update rikishi values (we handle admin authorization at application level)
+create policy "Allow updates to rikishi" on rikishi for update to anon, authenticated using (true);
+
 -- Draft selections policies
 create policy "Anyone can view all draft selections" on draft_selections for select to anon, authenticated using (true);
 create policy "Users can create their own selections" on draft_selections for insert to anon, authenticated with check (true);

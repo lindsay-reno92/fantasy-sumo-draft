@@ -88,31 +88,47 @@ module.exports = async (req, res) => {
     }
 
     try {
+      console.log('Admin update attempt:', {
+        rikishiId,
+        draftValue,
+        sessionData: { userId: sessionData.userId, isAdmin: sessionData.isAdmin }
+      });
+
       const { data, error } = await supabase
         .from('rikishi')
         .update({ draft_value: draftValue })
         .eq('id', rikishiId)
-        .select()
-        .single();
+        .select();
 
       if (error) {
-        console.error('Error updating rikishi:', error);
-        return res.status(500).json({ error: 'Database error' });
+        console.error('Supabase update error:', error);
+        return res.status(500).json({ 
+          error: 'Database update failed',
+          details: error.message,
+          code: error.code,
+          hint: error.hint
+        });
       }
 
-      if (!data) {
-        return res.status(404).json({ error: 'Rikishi not found' });
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: 'Rikishi not found or no changes made' });
       }
 
-      res.json({ 
+      console.log('Update successful:', data[0]);
+
+      res.json({
         message: 'Draft value updated successfully',
-        rikishiId: parseInt(rikishiId),
-        newValue: draftValue
+        rikishiId: rikishiId,
+        newValue: draftValue,
+        rikishi: data[0]
       });
 
     } catch (error) {
       console.error('Error in PUT /api/rikishi/[id]:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ 
+        error: 'Internal server error',
+        details: error.message
+      });
     }
 
   } else {
