@@ -33,6 +33,7 @@ module.exports = async (req, res) => {
     const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
 
     res.json({
+      sumoName: sessionData.sumoName,
       selectedRikishi: draftStatus.selectedRikishi,
       totalSpent: draftStatus.totalSpent,
       remainingPoints: draftStatus.remainingPoints,
