@@ -1,82 +1,18 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const fs = require('fs');
 const cookie = require('cookie');
-const crypto = require('crypto');
+const { verifySession } = require('../_session-store');
+const { supabaseQueries } = require('../../lib/supabase');
 
-const SESSION_SECRET = process.env.SESSION_SECRET || 'fantasy-sumo-draft-secret';
-
-// Database helper
-function getDatabase() {
-  const dbPath = process.env.VERCEL ? '/tmp' : path.join(__dirname, '../../database');
-  if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath, { recursive: true });
-  }
-
-  const db = new sqlite3.Database(path.join(dbPath, 'fantasy_sumo_draft.db'));
-  
-  // Initialize tables if needed
-  db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS rikishi (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      official_rank TEXT,
-      ranking_group TEXT,
-      draft_value INTEGER DEFAULT 5,
-      wins INTEGER DEFAULT 0,
-      losses INTEGER DEFAULT 0,
-      absences INTEGER DEFAULT 0,
-      last_tourney_wins INTEGER DEFAULT 0,
-      last_tourney_losses INTEGER DEFAULT 0,
-      weight_lbs REAL,
-      height_inches REAL,
-      age REAL,
-      times_picked INTEGER DEFAULT 0
-    )`);
-    
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sumo_name TEXT UNIQUE NOT NULL,
-      remaining_points INTEGER DEFAULT 50,
-      is_draft_finalized BOOLEAN DEFAULT FALSE
-    )`);
-    
-    db.run(`CREATE TABLE IF NOT EXISTS draft_selections (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER,
-      rikishi_id INTEGER,
-      selected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users (id),
-      FOREIGN KEY (rikishi_id) REFERENCES rikishi (id),
-      UNIQUE (user_id, rikishi_id)
-    )`);
-  });
-
-  return db;
-}
+// Get the supabase client directly
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 // Session helper
-function verifySession(sessionCookie) {
-  if (!sessionCookie) return null;
-  
-  try {
-    const [payload, signature] = sessionCookie.split('.');
-    const expectedSignature = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64');
-    
-    if (signature !== expectedSignature) return null;
-    
-    return JSON.parse(Buffer.from(payload, 'base64').toString());
-  } catch {
-    return null;
-  }
-}
-
 function requireAuth(req) {
   const cookies = cookie.parse(req.headers.cookie || '');
   return verifySession(cookies.session);
 }
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -96,62 +32,102 @@ module.exports = (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const db = getDatabase();
+  try {
+    console.log('Fetching all finalized drafts...');
 
-  // Get all finalized drafts
-  const query = `
-    SELECT 
-      u.sumo_name,
-      u.id as user_id,
-      COUNT(ds.id) as selected_count,
-      COALESCE(SUM(r.draft_value), 0) as total_spent
-    FROM users u
-    LEFT JOIN draft_selections ds ON u.id = ds.user_id
-    LEFT JOIN rikishi r ON ds.rikishi_id = r.id
-    WHERE u.is_draft_finalized = 1
-    GROUP BY u.id, u.sumo_name
-    ORDER BY u.sumo_name
-  `;
+    // Get all finalized users
+    const { data: finalizedUsers, error: usersError } = await supabase
+      .from('users')
+      .select('id, sumo_name, remaining_points')
+      .eq('is_draft_finalized', true)
+      .order('sumo_name');
 
-  db.all(query, [], (err, users) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+    if (usersError) {
+      console.error('Error fetching finalized users:', usersError);
+      return res.status(500).json({ error: 'Failed to fetch finalized users' });
     }
 
-    // Get detailed selections for each user
-    const userPromises = users.map(user => {
-      return new Promise((resolve, reject) => {
-        const selectionsQuery = `
-          SELECT r.*
-          FROM draft_selections ds
-          JOIN rikishi r ON ds.rikishi_id = r.id
-          WHERE ds.user_id = ?
-          ORDER BY r.ranking_group, r.draft_value DESC
-        `;
-        
-        db.all(selectionsQuery, [user.user_id], (err, selections) => {
-          if (err) return reject(err);
-          
-          resolve({
-            sumoName: user.sumo_name,
-            selectedCount: user.selected_count,
-            totalSpent: user.total_spent,
-            remainingPoints: 50 - user.total_spent,
-            selectedRikishi: selections
-          });
-        });
-      });
-    });
+    console.log(`Found ${finalizedUsers.length} finalized users`);
 
-    Promise.all(userPromises)
-      .then(finalizedDrafts => {
-        res.json({
-          finalizedDrafts: finalizedDrafts,
-          totalUsers: finalizedDrafts.length
-        });
-      })
-      .catch(() => {
-        res.status(500).json({ error: 'Error retrieving draft data' });
-      });
-  });
+    if (finalizedUsers.length === 0) {
+      return res.json([]);
+    }
+
+    // Get detailed selections for each finalized user
+    const allDrafts = [];
+    
+    for (const user of finalizedUsers) {
+      try {
+        // Get user's selected rikishi with full details
+        const { data: userSelections, error: selectionsError } = await supabase
+          .from('draft_selections')
+          .select(`
+            rikishi (
+              id,
+              name,
+              official_rank,
+              ranking_group,
+              draft_value,
+              wins,
+              losses,
+              absences,
+              last_tourney_wins,
+              last_tourney_losses,
+              weight_lbs,
+              height_inches,
+              age,
+              times_picked
+            )
+          `)
+          .eq('user_id', user.id);
+
+        if (selectionsError) {
+          console.error(`Error fetching selections for user ${user.id}:`, selectionsError);
+          continue; // Skip this user but continue with others
+        }
+
+        // Extract rikishi data and calculate totals
+        const rikishi = userSelections.map(selection => selection.rikishi);
+        const totalSpent = rikishi.reduce((sum, r) => sum + r.draft_value, 0);
+
+        const userDraft = {
+          userId: user.id,
+          sumoName: user.sumo_name,
+          isDraftFinalized: true,
+          rikishi: rikishi.sort((a, b) => {
+            // Sort by ranking group first, then by draft value
+            const groupOrder = { 'Yellow': 1, 'Blue': 2, 'Green': 3, 'White': 4 };
+            const aOrder = groupOrder[a.ranking_group] || 5;
+            const bOrder = groupOrder[b.ranking_group] || 5;
+            
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            return b.draft_value - a.draft_value;
+          }),
+          totalSpent,
+          remainingPoints: 50 - totalSpent,
+          rikishiCount: rikishi.length
+        };
+
+        allDrafts.push(userDraft);
+
+      } catch (userError) {
+        console.error(`Error processing user ${user.id}:`, userError);
+        continue; // Skip this user but continue with others
+      }
+    }
+
+    console.log(`Successfully processed ${allDrafts.length} finalized drafts`);
+
+    // Sort drafts by sumo name for consistent ordering
+    allDrafts.sort((a, b) => a.sumoName.localeCompare(b.sumoName));
+
+    res.json(allDrafts);
+
+  } catch (error) {
+    console.error('Error in all-finalized endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to load finalized drafts',
+      details: error.message
+    });
+  }
 }; 
