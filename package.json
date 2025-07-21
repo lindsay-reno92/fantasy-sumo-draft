@@ -7,18 +7,24 @@
     "server": "nodemon server/index.js",
     "client": "cd client && npm start",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "cd client && npm install && npm run build",
     "start": "node server/index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "sqlite3": "^5.1.6",
-    "express-session": "^1.17.3",
+    "@supabase/supabase-js": "^2.52.0",
     "concurrently": "^8.2.2",
-    "nodemon": "^3.0.2"
+    "cookie": "^0.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "nodemon": "^3.0.2",
+    "sqlite3": "^5.1.6"
   },
-  "keywords": ["fantasy", "sumo", "draft", "sports"],
+  "keywords": [
+    "fantasy",
+    "sumo",
+    "draft",
+    "sports"
+  ],
   "author": "Your Name",
   "license": "MIT"
-} 
+}

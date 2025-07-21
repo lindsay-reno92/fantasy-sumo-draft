@@ -1,15 +1,12 @@
 {
-  "buildCommand": "echo 'BUILD START' && date && cd client && npm ci --silent && echo 'DEPS DONE' && date && npm run build && echo 'BUILD DONE' && date",
-  "outputDirectory": "client/build",
-  "installCommand": "echo 'INSTALL START' && date && npm install --silent && cd client && npm install --silent && echo 'INSTALL DONE' && date",
-  "env": {
-    "NPM_CONFIG_AUDIT": "false",
-    "NPM_CONFIG_FUND": "false",
-    "NPM_CONFIG_UPDATE_NOTIFIER": "false",
-    "NPM_CONFIG_LOGLEVEL": "error",
-    "CI": "true",
-    "NODE_ENV": "production",
-    "DISABLE_OPENCOLLECTIVE": "true",
-    "ADBLOCK": "true"
-  }
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/((?!static).*)",
+      "dest": "/index.html"
+    }
+  ]
 } 
