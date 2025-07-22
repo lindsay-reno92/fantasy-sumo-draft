@@ -31,7 +31,16 @@ module.exports = async (req, res) => {
     const sessionData = verifySession(cookies.session);
     console.log('Session verification result:', !!sessionData);
     console.log('Session data keys:', sessionData ? Object.keys(sessionData) : 'null');
-    console.log('Session userId:', sessionData ? sessionData.userId : 'undefined');
+    
+    // Safely access userId
+    let userId;
+    try {
+      userId = sessionData?.userId;
+      console.log('Session userId (safe access):', userId);
+    } catch (error) {
+      console.log('Error accessing userId:', error.message);
+      userId = null;
+    }
 
     // Just return success for now - no validation
     console.log('Returning test success response');
@@ -40,7 +49,7 @@ module.exports = async (req, res) => {
       message: 'MINIMAL TEST - Hater pick endpoint working!',
       debug: {
         sessionExists: !!sessionData,
-        userId: sessionData ? sessionData.userId : null,
+        userId: userId,
         method: req.method,
         timestamp: new Date().toISOString()
       }
