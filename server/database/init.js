@@ -53,6 +53,18 @@ db.serialize(() => {
     UNIQUE(user_id, rikishi_id)
   )`);
 
+  // Hater picks table
+  db.run(`CREATE TABLE IF NOT EXISTS hater_picks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    rikishi_id INTEGER NOT NULL,
+    hater_cost INTEGER NOT NULL CHECK (hater_cost > 0),
+    selected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id),
+    FOREIGN KEY (rikishi_id) REFERENCES rikishi (id),
+    UNIQUE(user_id)
+  )`);
+
   // Load rikishi data from CSV
   loadRikishiData();
 });

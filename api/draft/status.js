@@ -38,7 +38,9 @@ module.exports = async (req, res) => {
       totalSpent: draftStatus.totalSpent,
       remainingPoints: draftStatus.remainingPoints,
       selectedCount: draftStatus.selectedCount,
-      isDraftFinalized: sessionData.isDraftFinalized || false
+      isDraftFinalized: sessionData.isDraftFinalized || false,
+      haterPick: draftStatus.haterPick,
+      haterPickCost: draftStatus.haterPickCost
     });
 
   } catch (error) {

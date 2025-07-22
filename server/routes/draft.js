@@ -47,14 +47,33 @@ router.get('/status', requireAuth, (req, res) => {
         return res.status(500).json({ error: 'Database error' });
       }
 
-      const totalSpent = selections.reduce((sum, r) => sum + r.draft_value, 0);
+      const regularDraftSpent = selections.reduce((sum, r) => sum + r.draft_value, 0);
 
-      res.json({
-        sumoName: user.sumo_name,
-        remainingPoints: 50 - totalSpent,
-        isDraftFinalized: user.is_draft_finalized,
-        selectedRikishi: selections,
-        totalSpent
+      // Get hater pick
+      const haterQuery = `
+        SELECT hp.hater_cost, r.*
+        FROM hater_picks hp
+        JOIN rikishi r ON hp.rikishi_id = r.id
+        WHERE hp.user_id = ?
+      `;
+
+      db.get(haterQuery, [userId], (err, haterPick) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error getting hater pick' });
+        }
+
+        const haterPickCost = haterPick ? haterPick.hater_cost : 0;
+        const totalSpent = regularDraftSpent + haterPickCost;
+
+        res.json({
+          sumoName: user.sumo_name,
+          remainingPoints: 50 - totalSpent,
+          isDraftFinalized: user.is_draft_finalized,
+          selectedRikishi: selections,
+          totalSpent: totalSpent, // Include both regular draft and hater pick costs
+          haterPick: haterPick || null,
+          haterPickCost: haterPickCost
+        });
       });
     });
   });
@@ -371,6 +390,165 @@ router.post('/reset/:userId', requireAuth, requireAdmin, (req, res) => {
         res.json({
           message: `${user.sumo_name}'s draft has been reset. They can now draft again.`,
           resetUser: user.sumo_name
+        });
+      });
+    });
+  });
+});
+
+// Hater pick endpoints
+
+// Add or update hater pick
+router.post('/hater-pick', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+  const { rikishiId, haterCost } = req.body;
+
+  if (!rikishiId || !haterCost || haterCost < 1) {
+    return res.status(400).json({ error: 'Invalid rikishi ID or hater cost' });
+  }
+
+  // Check if draft is finalized
+  const userQuery = 'SELECT is_draft_finalized, remaining_points FROM users WHERE id = ?';
+  db.get(userQuery, [userId], (err, user) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.is_draft_finalized) {
+      return res.status(400).json({ error: 'Draft is already finalized' });
+    }
+
+    // Check if rikishi exists
+    const rikishiQuery = 'SELECT * FROM rikishi WHERE id = ?';
+    db.get(rikishiQuery, [rikishiId], (err, rikishi) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (!rikishi) {
+        return res.status(404).json({ error: 'Rikishi not found' });
+      }
+
+      // Check if rikishi is already in user's regular draft
+      const draftCheckQuery = 'SELECT id FROM draft_selections WHERE user_id = ? AND rikishi_id = ?';
+      db.get(draftCheckQuery, [userId, rikishiId], (err, draftSelection) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (draftSelection) {
+          return res.status(400).json({ error: 'Cannot select a rikishi you have already drafted as a hater pick' });
+        }
+
+        // Get current hater pick cost for point calculation
+        const currentHaterQuery = 'SELECT hater_cost FROM hater_picks WHERE user_id = ?';
+        db.get(currentHaterQuery, [userId], (err, currentHater) => {
+          if (err) {
+            return res.status(500).json({ error: 'Database error' });
+          }
+
+          const currentHaterCost = currentHater ? currentHater.hater_cost : 0;
+          const netCostChange = haterCost - currentHaterCost;
+
+          // Check if user has enough points
+          if (netCostChange > user.remaining_points) {
+            return res.status(400).json({ 
+              error: `Not enough points! Hater pick costs ${haterCost} points, you have ${user.remaining_points} remaining.`,
+              currentCost: currentHaterCost,
+              newCost: haterCost,
+              netChange: netCostChange
+            });
+          }
+
+          // Insert or replace hater pick
+          const upsertHaterQuery = `
+            INSERT OR REPLACE INTO hater_picks (user_id, rikishi_id, hater_cost, selected_at) 
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+          `;
+          
+          db.run(upsertHaterQuery, [userId, rikishiId, haterCost], function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Error updating hater pick' });
+            }
+
+            // Update user's remaining points
+            const newRemainingPoints = user.remaining_points - netCostChange;
+            const updatePointsQuery = 'UPDATE users SET remaining_points = ? WHERE id = ?';
+            
+            db.run(updatePointsQuery, [newRemainingPoints, userId], function(err) {
+              if (err) {
+                return res.status(500).json({ error: 'Error updating points' });
+              }
+
+              res.json({
+                success: true,
+                message: `${rikishi.name} selected as your hater pick!`,
+                rikishi: rikishi,
+                haterCost: haterCost,
+                remainingPoints: newRemainingPoints,
+                netCostChange: netCostChange
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+// Remove hater pick
+router.delete('/hater-pick', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+
+  // Get current hater pick
+  const haterQuery = `
+    SELECT hp.hater_cost, r.name as rikishi_name
+    FROM hater_picks hp
+    JOIN rikishi r ON hp.rikishi_id = r.id
+    WHERE hp.user_id = ?
+  `;
+  
+  db.get(haterQuery, [userId], (err, haterPick) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!haterPick) {
+      return res.status(404).json({ error: 'No hater pick found' });
+    }
+
+    // Remove hater pick
+    const deleteQuery = 'DELETE FROM hater_picks WHERE user_id = ?';
+    db.run(deleteQuery, [userId], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error removing hater pick' });
+      }
+
+      // Restore points to user
+      const getUserQuery = 'SELECT remaining_points FROM users WHERE id = ?';
+      db.get(getUserQuery, [userId], (err, user) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        const newRemainingPoints = user.remaining_points + haterPick.hater_cost;
+        const updatePointsQuery = 'UPDATE users SET remaining_points = ? WHERE id = ?';
+        
+        db.run(updatePointsQuery, [newRemainingPoints, userId], function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error restoring points' });
+          }
+
+          res.json({
+            success: true,
+            message: `Hater pick removed. ${haterPick.hater_cost} points restored.`,
+            restoredPoints: haterPick.hater_cost,
+            remainingPoints: newRemainingPoints
+          });
         });
       });
     });

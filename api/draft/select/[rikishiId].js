@@ -57,6 +57,14 @@ module.exports = async (req, res) => {
       return res.status(404).json({ error: 'Rikishi not found' });
     }
 
+    // Check mutual exclusivity between hater pick and white tier
+    const hasHaterPick = draftStatus.haterPick !== null && draftStatus.haterPick !== undefined;
+    if (rikishi.ranking_group === 'White' && hasHaterPick) {
+      return res.status(400).json({
+        error: `Cannot select White tier rikishi when you have a hater pick! You chose ${draftStatus.haterPick.name} as your hater pick. Remove the hater pick first if you want to draft White tier rikishi instead.`
+      });
+    }
+
     // Check if user has enough points
     const newTotal = draftStatus.totalSpent + rikishi.draft_value;
     if (newTotal > 50) {

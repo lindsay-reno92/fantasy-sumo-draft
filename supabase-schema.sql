@@ -39,10 +39,21 @@ create table if not exists draft_selections (
   unique(user_id, rikishi_id)
 );
 
+-- Hater picks table
+create table if not exists hater_picks (
+  id bigserial primary key,
+  user_id bigint references users(id) on delete cascade,
+  rikishi_id integer references rikishi(id) on delete cascade,
+  hater_cost integer not null check (hater_cost > 0),
+  selected_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(user_id) -- Each user can only have one hater pick
+);
+
 -- Row Level Security Policies
 alter table users enable row level security;
 alter table rikishi enable row level security;  
 alter table draft_selections enable row level security;
+alter table hater_picks enable row level security;
 
 -- Users policies
 create policy "Users can view all users" on users for select to anon, authenticated using (true);
