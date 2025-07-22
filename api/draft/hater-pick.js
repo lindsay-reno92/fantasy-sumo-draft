@@ -17,17 +17,10 @@ module.exports = async (req, res) => {
       return res.status(200).end();
     }
 
-    // Test basic functionality
-    console.log('Function started, method:', req.method);
-
     // Test imports - step by step
     console.log('Testing session store import...');
     const { verifySession } = require('../_session-store');
     console.log('Session store imported successfully');
-
-    console.log('Testing supabase import...');
-    const { supabaseQueries } = require('../../lib/supabase');
-    console.log('Supabase queries imported successfully');
 
     // Test session
     console.log('Parsing cookies...');
@@ -37,51 +30,21 @@ module.exports = async (req, res) => {
     console.log('Verifying session...');
     const sessionData = verifySession(cookies.session);
     console.log('Session verification result:', !!sessionData);
+    console.log('Session data keys:', sessionData ? Object.keys(sessionData) : 'null');
+    console.log('Session userId:', sessionData ? sessionData.userId : 'undefined');
 
-    if (!sessionData || !sessionData.userId) {
-      console.log('Auth failed - no valid session');
-      console.log('Session data:', sessionData);
-      return res.status(401).json({ error: 'Not authenticated', debug: 'No valid session' });
-    }
-
-    console.log('User authenticated:', sessionData.userId);
-    console.log('Request method check:', req.method);
-    console.log('About to check if POST...');
-
-    if (req.method === 'POST') {
-      console.log('INSIDE POST BLOCK');
-      const { rikishiId, haterCost } = req.body;
-      console.log('POST data:', { rikishiId, haterCost });
-
-      if (!rikishiId || !haterCost) {
-        console.log('Missing required fields');
-        return res.status(400).json({ error: 'Missing rikishiId or haterCost' });
+    // Just return success for now - no validation
+    console.log('Returning test success response');
+    return res.json({ 
+      success: true, 
+      message: 'MINIMAL TEST - Hater pick endpoint working!',
+      debug: {
+        sessionExists: !!sessionData,
+        userId: sessionData ? sessionData.userId : null,
+        method: req.method,
+        timestamp: new Date().toISOString()
       }
-
-      console.log('All validations passed - returning success');
-      // Test simple response first
-      return res.json({ 
-        success: true, 
-        message: 'Hater pick test successful!',
-        debug: {
-          userId: sessionData.userId,
-          rikishiId,
-          haterCost,
-          timestamp: new Date().toISOString()
-        }
-      });
-
-    } else if (req.method === 'DELETE') {
-      console.log('DELETE request');
-      return res.json({ 
-        success: true, 
-        message: 'DELETE test successful',
-        debug: { userId: sessionData.userId }
-      });
-    } else {
-      console.log('Invalid method:', req.method);
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
+    });
 
   } catch (error) {
     console.error('=== HATER PICK ERROR ===');
