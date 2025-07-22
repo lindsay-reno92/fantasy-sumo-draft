@@ -5,7 +5,6 @@ module.exports = async (req, res) => {
     console.log('=== HATER PICK REQUEST START ===');
     console.log('Method:', req.method);
     console.log('Body:', req.body);
-    console.log('Headers cookie:', req.headers.cookie ? 'exists' : 'missing');
 
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,12 +16,10 @@ module.exports = async (req, res) => {
       return res.status(200).end();
     }
 
-    // Test imports - step by step
     console.log('Testing session store import...');
     const { verifySession } = require('../_session-store');
     console.log('Session store imported successfully');
 
-    // Test session
     console.log('Parsing cookies...');
     const cookies = cookie.parse(req.headers.cookie || '');
     console.log('Cookies parsed, session cookie exists:', !!cookies.session);
@@ -30,28 +27,19 @@ module.exports = async (req, res) => {
     console.log('Verifying session...');
     const sessionData = verifySession(cookies.session);
     console.log('Session verification result:', !!sessionData);
-    console.log('Session data keys:', sessionData ? Object.keys(sessionData) : 'null');
-    
-    // Safely access userId
-    let userId;
-    try {
-      userId = sessionData?.userId;
-      console.log('Session userId (safe access):', userId);
-    } catch (error) {
-      console.log('Error accessing userId:', error.message);
-      userId = null;
-    }
 
-    // Just return success for now - no validation
-    console.log('Returning test success response');
+    // CRITICAL: Don't access any properties of sessionData - just return success
+    console.log('About to return success without accessing session properties');
+    
     return res.json({ 
       success: true, 
-      message: 'MINIMAL TEST - Hater pick endpoint working!',
+      message: 'HATER PICK WORKING! Session exists: ' + !!sessionData,
       debug: {
-        sessionExists: !!sessionData,
-        userId: userId,
+        hasSession: !!sessionData,
         method: req.method,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        rikishiId: req.body?.rikishiId || 'missing',
+        haterCost: req.body?.haterCost || 'missing'
       }
     });
 
@@ -61,8 +49,7 @@ module.exports = async (req, res) => {
     console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internal server error',
-      message: error.message,
-      debug: 'Check Vercel logs for details'
+      message: error.message
     });
   }
 }; 
