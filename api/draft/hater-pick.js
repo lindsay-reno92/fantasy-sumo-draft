@@ -45,8 +45,11 @@ module.exports = async (req, res) => {
     }
 
     console.log('User authenticated:', sessionData.userId);
+    console.log('Request method check:', req.method);
+    console.log('About to check if POST...');
 
     if (req.method === 'POST') {
+      console.log('INSIDE POST BLOCK');
       const { rikishiId, haterCost } = req.body;
       console.log('POST data:', { rikishiId, haterCost });
 
