@@ -32,11 +32,11 @@ module.exports = async (req, res) => {
     console.log('About to return success without accessing session properties');
     console.log('Attempting basic response...');
     
-    // Try the most basic response possible
-    res.status(200).end('SUCCESS');
-    
-    console.log('ERROR: This should never execute if return worked!');
-    return;
+    // Try proper Vercel response ending
+    return res.status(200).json({ 
+      success: true, 
+      message: 'HATER PICK SUCCESS! Function working!' 
+    });
 
   } catch (error) {
     console.error('=== HATER PICK ERROR ===');
