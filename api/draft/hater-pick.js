@@ -30,18 +30,13 @@ module.exports = async (req, res) => {
 
     // CRITICAL: Don't access any properties of sessionData - just return success
     console.log('About to return success without accessing session properties');
+    console.log('Attempting basic response...');
     
-    return res.json({ 
-      success: true, 
-      message: 'HATER PICK WORKING! Session exists: ' + !!sessionData,
-      debug: {
-        hasSession: !!sessionData,
-        method: req.method,
-        timestamp: new Date().toISOString(),
-        rikishiId: req.body?.rikishiId || 'missing',
-        haterCost: req.body?.haterCost || 'missing'
-      }
-    });
+    // Try the most basic response possible
+    res.status(200).end('SUCCESS');
+    
+    console.log('ERROR: This should never execute if return worked!');
+    return;
 
   } catch (error) {
     console.error('=== HATER PICK ERROR ===');
