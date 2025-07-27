@@ -1,8 +1,22 @@
 const cookie = require('cookie');
+const { verifySession } = require('../_session-store');
+const { supabaseQueries } = require('../../lib/supabase');
+
+// Session helper
+function requireAuth(req) {
+  const cookies = cookie.parse(req.headers.cookie || '');
+  const sessionData = verifySession(cookies.session);
+  
+  if (!sessionData) {
+    return null;
+  }
+  
+  return sessionData;
+}
 
 module.exports = async (req, res) => {
   try {
-    console.log('=== HATER PICK REQUEST START ===');
+    console.log('=== HATER PICK REQUEST ===');
     console.log('Method:', req.method);
     console.log('Body:', req.body);
 
@@ -12,31 +26,89 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
-      console.log('OPTIONS request - returning 200');
       return res.status(200).end();
     }
 
-    console.log('Testing session store import...');
-    const { verifySession } = require('../_session-store');
-    console.log('Session store imported successfully');
+    // Check authentication
+    const sessionData = requireAuth(req);
+    if (!sessionData) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
-    console.log('Parsing cookies...');
-    const cookies = cookie.parse(req.headers.cookie || '');
-    console.log('Cookies parsed, session cookie exists:', !!cookies.session);
+    if (req.method === 'POST') {
+      // Add/select hater pick
+      const { rikishiId, haterCost } = req.body;
 
-    console.log('Verifying session...');
-    const sessionData = verifySession(cookies.session);
-    console.log('Session verification result:', !!sessionData);
+      if (!rikishiId || !haterCost) {
+        return res.status(400).json({ error: 'Missing rikishiId or haterCost' });
+      }
 
-    // CRITICAL: Don't access any properties of sessionData - just return success
-    console.log('About to return success without accessing session properties');
-    console.log('Attempting basic response...');
-    
-    // Try proper Vercel response ending
-    return res.status(200).json({ 
-      success: true, 
-      message: 'HATER PICK SUCCESS! Function working!' 
-    });
+      // Get current draft status to check constraints
+      const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
+      
+      // Check if user already has white tier rikishi selected
+      const hasWhiteTier = draftStatus.selectedRikishi.some(r => r.ranking_group === 'White');
+      if (hasWhiteTier) {
+        const whiteTierRikishi = draftStatus.selectedRikishi.find(r => r.ranking_group === 'White');
+        return res.status(400).json({
+          error: `Cannot select hater pick when you have White tier rikishi! You have ${whiteTierRikishi.name} selected. Remove them first if you want to choose a hater pick instead.`
+        });
+      }
+
+      // Check if user has enough points for hater pick
+      const newTotal = draftStatus.totalSpent + haterCost;
+      if (newTotal > 50) {
+        return res.status(400).json({
+          error: 'Not enough points for hater pick',
+          currentSpent: draftStatus.totalSpent,
+          haterCost: haterCost,
+          wouldSpend: newTotal
+        });
+      }
+
+      // Get rikishi info for response
+      const { data: rikishi, error: rikishiError } = await supabaseQueries.getRikishi(rikishiId);
+
+      if (rikishiError || !rikishi) {
+        return res.status(404).json({ error: 'Rikishi not found' });
+      }
+
+      // Add hater pick
+      const { error: haterError } = await supabaseQueries.addHaterPick(sessionData.userId, rikishiId, haterCost);
+      
+      if (haterError) {
+        console.error('Hater pick error:', haterError);
+        return res.status(500).json({ error: 'Failed to add hater pick' });
+      }
+
+      console.log('Hater pick added successfully');
+
+      return res.status(200).json({
+        success: true,
+        message: `${rikishi.name} selected as your hater pick!`,
+        haterPick: rikishi,
+        haterCost: haterCost
+      });
+
+    } else if (req.method === 'DELETE') {
+      // Remove hater pick
+      const { error: removeError } = await supabaseQueries.removeHaterPick(sessionData.userId);
+      
+      if (removeError) {
+        console.error('Remove hater pick error:', removeError);
+        return res.status(500).json({ error: 'Failed to remove hater pick' });
+      }
+
+      console.log('Hater pick removed successfully');
+
+      return res.status(200).json({
+        success: true,
+        message: 'Hater pick removed successfully'
+      });
+
+    } else {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
 
   } catch (error) {
     console.error('=== HATER PICK ERROR ===');

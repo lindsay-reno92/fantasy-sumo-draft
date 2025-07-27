@@ -46,12 +46,7 @@ module.exports = async (req, res) => {
     }
 
     // Get the rikishi to check its value
-    const { supabase } = require('../../../lib/supabase');
-    const { data: rikishi, error: rikishiError } = await supabase
-      .from('rikishi')
-      .select('*')
-      .eq('id', rikishiIdNum)
-      .single();
+    const { data: rikishi, error: rikishiError } = await supabaseQueries.getRikishi(rikishiIdNum);
 
     if (rikishiError || !rikishi) {
       return res.status(404).json({ error: 'Rikishi not found' });

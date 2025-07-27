@@ -1,10 +1,6 @@
 const cookie = require('cookie');
 const { verifySession } = require('../_session-store');
-const { supabaseQueries } = require('../../lib/supabase');
-
-// Get the supabase client directly since it's not exported as supabaseServer
-const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const { supabaseQueries, supabase } = require('../../lib/supabase');
 
 // Session helper
 function requireAuth(req) {
@@ -38,37 +34,25 @@ module.exports = async (req, res) => {
   if (req.method === 'GET') {
     // Get individual rikishi details
     try {
-      const { data: rikishi, error } = await supabase
-        .from('rikishi')
-        .select(`
-          *,
-          draft_selections!inner(user_id)
-        `)
-        .eq('id', rikishiId)
-        .eq('draft_selections.user_id', sessionData.userId)
+      // First get the rikishi data
+      const { data: rikishi, error: rikishiError } = await supabaseQueries.getRikishi(rikishiId);
+      
+      if (rikishiError || !rikishi) {
+        return res.status(404).json({ error: 'Rikishi not found' });
+      }
+
+      // Check if selected by this user
+      const { data: selection, error: selectionError } = await supabase
+        .from('draft_selections')
+        .select('id')
+        .eq('user_id', sessionData.userId)
+        .eq('rikishi_id', rikishiId)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-        console.error('Error fetching rikishi:', error);
-        return res.status(500).json({ error: 'Database error' });
-      }
+      // selection will be null if not selected (this is not an error)
+      const isSelected = selection !== null;
 
-      if (!rikishi) {
-        // Try to get rikishi without selection info
-        const { data: rikishiData, error: rikishiError } = await supabase
-          .from('rikishi')
-          .select('*')
-          .eq('id', rikishiId)
-          .single();
-
-        if (rikishiError) {
-          return res.status(404).json({ error: 'Rikishi not found' });
-        }
-
-        res.json({ ...rikishiData, isSelected: false });
-      } else {
-        res.json({ ...rikishi, isSelected: true });
-      }
+      res.json({ ...rikishi, isSelected });
 
     } catch (error) {
       console.error('Error in GET /api/rikishi/[id]:', error);
@@ -98,7 +82,8 @@ module.exports = async (req, res) => {
         .from('rikishi')
         .update({ draft_value: draftValue })
         .eq('id', rikishiId)
-        .select();
+        .select()
+        .single();
 
       if (error) {
         console.error('Supabase update error:', error);
@@ -110,17 +95,17 @@ module.exports = async (req, res) => {
         });
       }
 
-      if (!data || data.length === 0) {
+      if (!data) {
         return res.status(404).json({ error: 'Rikishi not found or no changes made' });
       }
 
-      console.log('Update successful:', data[0]);
+      console.log('Update successful:', data);
 
       res.json({
         message: 'Draft value updated successfully',
         rikishiId: rikishiId,
         newValue: draftValue,
-        rikishi: data[0]
+        rikishi: data
       });
 
     } catch (error) {

@@ -86,9 +86,30 @@ module.exports = async (req, res) => {
           continue; // Skip this user but continue with others
         }
 
+        // Get user's hater pick if exists
+        const { data: haterPickData, error: haterError } = await supabase
+          .from('hater_picks')
+          .select(`
+            hater_cost,
+            rikishi (
+              id,
+              name,
+              official_rank,
+              ranking_group,
+              draft_value
+            )
+          `)
+          .eq('user_id', user.id)
+          .single();
+
+        // haterError is expected if no hater pick exists
+        const haterPick = haterPickData?.rikishi || null;
+        const haterPickCost = haterPickData?.hater_cost || 0;
+
         // Extract rikishi data and calculate totals
         const rikishi = userSelections.map(selection => selection.rikishi);
-        const totalSpent = rikishi.reduce((sum, r) => sum + r.draft_value, 0);
+        const regularDraftSpent = rikishi.reduce((sum, r) => sum + r.draft_value, 0);
+        const totalSpent = regularDraftSpent + haterPickCost;
 
         const userDraft = {
           userId: user.id,
@@ -105,7 +126,9 @@ module.exports = async (req, res) => {
           }),
           totalSpent,
           remainingPoints: 50 - totalSpent,
-          rikishiCount: rikishi.length
+          rikishiCount: rikishi.length,
+          haterPick: haterPick,
+          haterPickCost: haterPickCost
         };
 
         allDrafts.push(userDraft);
