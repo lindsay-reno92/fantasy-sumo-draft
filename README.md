@@ -189,4 +189,4 @@ This app celebrates the ancient sport of sumo wrestling with real rikishi data, 
 
 ---
 
-**Built with ❤️ for sumo fans everywhere** 🏟️ 
+**Built with ❤️ for sumo fans everywhere** 🏟️ # Updated error messages for better UX
