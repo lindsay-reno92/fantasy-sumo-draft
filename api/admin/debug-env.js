@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
   };
 
   res.json({
-    message: 'Environment debug info',
+    message: 'Environment debug info (fresh deploy)',
     debug
   });
 }; 
