@@ -63,11 +63,18 @@ module.exports = async (req, res) => {
     
     console.log('Sync operation completed successfully');
     
+    // Determine overall success
+    const hasResults = result.rikishi || result.basho;
+    const hasWarnings = result.warnings && result.warnings.length > 0;
+    
     res.json({
       success: true,
-      message: 'Sumo data sync completed successfully',
+      message: hasWarnings ? 
+        'Sumo data sync completed with limitations' : 
+        'Sumo data sync completed successfully',
       syncType,
       result,
+      warnings: hasWarnings ? result.warnings : undefined,
       timestamp: new Date().toISOString()
     });
     
@@ -76,6 +83,9 @@ module.exports = async (req, res) => {
     res.status(500).json({ 
       error: 'Sync operation failed',
       details: error.message,
+      helpText: error.message.includes('row-level security') ? 
+        'Database permissions issue - contact admin to configure service role key' : 
+        'Check server logs for details',
       timestamp: new Date().toISOString()
     });
   }
