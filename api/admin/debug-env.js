@@ -33,19 +33,31 @@ module.exports = async (req, res) => {
     return res.status(401).json({ error: 'Admin authentication required' });
   }
 
+  // Get all environment variables that start with SUPABASE
+  const supabaseEnvVars = {};
+  Object.keys(process.env).forEach(key => {
+    if (key.includes('SUPABASE')) {
+      supabaseEnvVars[key] = process.env[key] ? 
+        process.env[key].substring(0, 15) + '...' : 'NOT_SET';
+    }
+  });
+
   // Debug environment variables (safely)
   const debug = {
     hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     serviceKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY ? 
-      process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + '...' : 'NOT_SET',
+      process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'NOT_SET',
+    serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
     nodeEnv: process.env.NODE_ENV,
+    platform: process.env.VERCEL ? 'Vercel' : 'Local',
+    allSupabaseVars: supabaseEnvVars,
     timestamp: new Date().toISOString()
   };
 
   res.json({
-    message: 'Environment debug info (fresh deploy)',
+    message: 'Environment debug info (detailed)',
     debug
   });
 }; 
