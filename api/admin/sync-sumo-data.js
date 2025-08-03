@@ -38,14 +38,40 @@ module.exports = async (req, res) => {
     console.log('Admin sync requested by:', sessionData.userId);
     
     const sumoApi = new SumoApiService();
-    const syncType = req.body.syncType || 'full'; // 'full', 'rikishi-only', 'basho-only'
+    const syncType = req.body.syncType || 'full'; 
+    // Sync types: 'full', 'full-with-matches', 'rikishi-only', 'basho-only', 'matches-only'
     
     let result = {};
     
-    if (syncType === 'full' || syncType === 'rikishi-only') {
+    if (syncType === 'full-with-matches') {
+      console.log('Starting full sync with matches...');
+      const fullSync = await sumoApi.performFullSyncWithMatches();
+      result.rikishi = {
+        created: fullSync.created,
+        updated: fullSync.updated,
+        errors: fullSync.errors,
+        totalRikishi: fullSync.totalRikishi
+      };
+      result.basho = {
+        id: fullSync.bashoId,
+        location: fullSync.bashoLocation,
+        isActive: fullSync.isActive || false
+      };
+      result.matches = fullSync.matches;
+      result.serviceRoleAvailable = fullSync.serviceRoleAvailable;
+      result.warnings = fullSync.warnings;
+    }
+    else if (syncType === 'full' || syncType === 'rikishi-only') {
       console.log('Starting rikishi data sync...');
       const rikishiSync = await sumoApi.performFullSync();
-      result.rikishi = rikishiSync;
+      result.rikishi = {
+        created: rikishiSync.created,
+        updated: rikishiSync.updated,
+        errors: rikishiSync.errors,
+        totalRikishi: rikishiSync.totalRikishi
+      };
+      result.serviceRoleAvailable = rikishiSync.serviceRoleAvailable;
+      result.warnings = rikishiSync.warnings;
     }
     
     if (syncType === 'full' || syncType === 'basho-only') {
@@ -59,6 +85,19 @@ module.exports = async (req, res) => {
         startDate: bashoData.startDate,
         endDate: bashoData.endDate
       };
+    }
+    
+    if (syncType === 'matches-only') {
+      console.log('Starting matches-only sync...');
+      const matchSync = await sumoApi.performMatchSync();
+      result.basho = {
+        id: matchSync.bashoId,
+        location: matchSync.bashoLocation,
+        isActive: matchSync.isActive
+      };
+      result.matches = matchSync.matches;
+      result.serviceRoleAvailable = matchSync.serviceRoleAvailable;
+      result.warnings = matchSync.warnings;
     }
     
     console.log('Sync operation completed successfully');
