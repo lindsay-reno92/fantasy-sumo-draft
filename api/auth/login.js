@@ -76,14 +76,13 @@ module.exports = async (req, res) => {
       path: '/'
     }));
 
+    // Return flattened structure expected by client `SumoNameLogin.tsx`
     res.json({
-      message: 'Login successful',
-      user: {
-        id: user.id,
-        sumoName: user.sumo_name,
-        isAdmin: user.is_admin || false,
-        isDraftFinalized: user.is_draft_finalized || false
-      }
+      id: user.id,
+      sumoName: user.sumo_name,
+      isAdmin: user.is_admin || false,
+      isDraftFinalized: user.is_draft_finalized || false,
+      remainingPoints: user.remaining_points ?? 50
     });
 
   } catch (error) {

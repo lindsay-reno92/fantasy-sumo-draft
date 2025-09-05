@@ -1,4 +1,5 @@
 module.exports = async (req, res) => {
+  // noop: trigger redeploy
   // Basic health check with debug info
   const debugInfo = {
     timestamp: new Date().toISOString(),
