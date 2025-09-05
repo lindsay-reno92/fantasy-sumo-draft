@@ -1,6 +1,7 @@
 const cookie = require('cookie');
 const { signSession } = require('../_session-store');
 const { supabaseQueries } = require('../../lib/supabase');
+const { DRAFT_BUDGET } = require('../../lib/config');
 
 module.exports = async (req, res) => {
   // CORS headers
@@ -82,7 +83,7 @@ module.exports = async (req, res) => {
       sumoName: user.sumo_name,
       isAdmin: user.is_admin || false,
       isDraftFinalized: user.is_draft_finalized || false,
-      remainingPoints: user.remaining_points ?? 50
+      remainingPoints: user.remaining_points ?? DRAFT_BUDGET
     });
 
   } catch (error) {

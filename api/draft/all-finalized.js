@@ -1,6 +1,7 @@
 const cookie = require('cookie');
 const { verifySession } = require('../_session-store');
 const { supabaseQueries } = require('../../lib/supabase');
+const { DRAFT_BUDGET } = require('../../lib/config');
 
 // Get the supabase client directly
 const { createClient } = require('@supabase/supabase-js');
@@ -125,7 +126,7 @@ module.exports = async (req, res) => {
             return b.draft_value - a.draft_value;
           }),
           totalSpent,
-          remainingPoints: 50 - totalSpent,
+          remainingPoints: DRAFT_BUDGET - totalSpent,
           rikishiCount: rikishi.length,
           haterPick: haterPick,
           haterPickCost: haterPickCost

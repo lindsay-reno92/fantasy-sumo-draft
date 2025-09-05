@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/init');
+const { DRAFT_BUDGET } = require('../../lib/config');
 
 // Middleware to check authentication
 const requireAuth = (req, res, next) => {
@@ -67,7 +68,7 @@ router.get('/status', requireAuth, (req, res) => {
 
         res.json({
           sumoName: user.sumo_name,
-          remainingPoints: 50 - totalSpent,
+          remainingPoints: DRAFT_BUDGET - totalSpent,
           isDraftFinalized: user.is_draft_finalized,
           selectedRikishi: selections,
           totalSpent: totalSpent, // Include both regular draft and hater pick costs
@@ -134,7 +135,7 @@ router.get('/all-finalized', requireAuth, (req, res) => {
     // Convert to array and add remaining points
     const finalizedDrafts = Object.values(userDrafts).map(draft => ({
       ...draft,
-      remainingPoints: 50 - draft.totalSpent,
+      remainingPoints: DRAFT_BUDGET - draft.totalSpent,
       rikishiCount: draft.rikishi.length
     }));
 
@@ -193,7 +194,7 @@ router.post('/select/:rikishiId', requireAuth, (req, res) => {
             return res.status(500).json({ error: 'Database error' });
           }
 
-          const remainingPoints = 50 - pointsResult.total_spent;
+          const remainingPoints = DRAFT_BUDGET - pointsResult.total_spent;
 
           if (remainingPoints < rikishi.draft_value) {
             return res.status(400).json({ 
@@ -269,7 +270,7 @@ router.delete('/deselect/:rikishiId', requireAuth, (req, res) => {
 
           res.json({
             message: `${rikishi ? rikishi.name : 'Rikishi'} removed from your draft`,
-            remainingPoints: 50 - pointsResult.total_spent
+            remainingPoints: DRAFT_BUDGET - pointsResult.total_spent
           });
         });
       });

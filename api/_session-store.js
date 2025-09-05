@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { DRAFT_BUDGET } = require('../lib/config');
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'fantasy-sumo-draft-secret';
 
@@ -54,8 +55,8 @@ function addSelectionToSession(sessionCookie, rikishiId, rikishiData) {
   
   // Check points
   const cost = rikishiData.draft_value || 0;
-  if (sessionData.totalSpent + cost > 50) {
-    return { error: `Not enough points. Need ${cost}, have ${50 - sessionData.totalSpent}`, sessionData };
+  if (sessionData.totalSpent + cost > DRAFT_BUDGET) {
+    return { error: `Not enough points. Need ${cost}, have ${DRAFT_BUDGET - sessionData.totalSpent}`, sessionData };
   }
   
   // Add selection

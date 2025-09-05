@@ -1,6 +1,7 @@
 const cookie = require('cookie');
 const { verifySession } = require('../_session-store');
 const { supabaseQueries } = require('../../lib/supabase');
+const { DRAFT_BUDGET } = require('../../lib/config');
 
 // Session helper
 function requireAuth(req) {
@@ -57,7 +58,7 @@ module.exports = async (req, res) => {
 
       // Check if user has enough points for hater pick
       const newTotal = draftStatus.totalSpent + haterCost;
-      if (newTotal > 50) {
+      if (newTotal > DRAFT_BUDGET) {
         return res.status(400).json({
           error: 'Not enough points for hater pick',
           currentSpent: draftStatus.totalSpent,

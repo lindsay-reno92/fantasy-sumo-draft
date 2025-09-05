@@ -31,6 +31,14 @@ module.exports = async (req, res) => {
 
   res.json({
     status: 'ok',
-    debug: debugInfo
+    debug: debugInfo,
+    flags: (() => {
+      try {
+        const { NO_POINTS_MODE, DRAFT_BUDGET } = require('../lib/config');
+        return { NO_POINTS_MODE, DRAFT_BUDGET };
+      } catch {
+        return { NO_POINTS_MODE: undefined, DRAFT_BUDGET: undefined };
+      }
+    })()
   });
 }; 
