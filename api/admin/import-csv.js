@@ -62,10 +62,15 @@ module.exports = async (req, res) => {
     const sessionData = requireAdmin(req);
     if (!sessionData) return res.status(401).json({ error: 'Admin authentication required' });
 
-    // Load CSV from repo root
-    const csvPath = path.join(process.cwd(), 'Sumo Fantasy Stats - Lindsay.csv');
-    if (!fs.existsSync(csvPath)) {
-      return res.status(404).json({ error: 'CSV file not found', path: csvPath });
+    // Load CSV from repo root (prefer newest_sumo_data.csv, fallback to old name)
+    const candidateFiles = ['newest_sumo_data.csv', 'Sumo Fantasy Stats - Lindsay.csv'];
+    let csvPath = null;
+    for (const fname of candidateFiles) {
+      const p = path.join(process.cwd(), fname);
+      if (fs.existsSync(p)) { csvPath = p; break; }
+    }
+    if (!csvPath) {
+      return res.status(404).json({ error: 'CSV file not found', tried: candidateFiles });
     }
     const content = fs.readFileSync(csvPath, 'utf8');
     const { headers, rows } = parseCsv(content);
@@ -111,60 +116,59 @@ module.exports = async (req, res) => {
     const toUpdate = [];
 
     for (const cols of rows) {
-      const name = toStringVal(cols[nameIdx]);
+      const name = nameIdx >= 0 ? toStringVal(cols[nameIdx]) : null;
       if (!name) continue;
-      const official_rank = toStringVal(cols[rankTextIdx]);
-      const ranking_group = toStringVal(cols[groupIdx]);
-      const wins = toNumber(cols[winsIdx], 0) || 0;
-      const losses = toNumber(cols[lossesIdx], 0) || 0;
-      const absences = toNumber(cols[absencesIdx], 0) || 0;
-      const weight_lbs = toNumber(cols[weightIdx], null);
-      const height_inches = toNumber(cols[heightIdx], null);
-      const age = toNumber(cols[ageIdx], null);
-      const birthday = toStringVal(cols[birthdayIdx]);
-      const times_picked = toNumber(cols[timesPickedIdx], 0) || 0;
+      const official_rank = rankTextIdx >= 0 ? toStringVal(cols[rankTextIdx]) : undefined;
+      const ranking_group = groupIdx >= 0 ? toStringVal(cols[groupIdx]) : undefined;
+      const wins = winsIdx >= 0 ? (toNumber(cols[winsIdx], 0) || 0) : undefined;
+      const losses = lossesIdx >= 0 ? (toNumber(cols[lossesIdx], 0) || 0) : undefined;
+      const absences = absencesIdx >= 0 ? (toNumber(cols[absencesIdx], 0) || 0) : undefined;
+      const weight_lbs = weightIdx >= 0 ? toNumber(cols[weightIdx], null) : undefined;
+      const height_inches = heightIdx >= 0 ? toNumber(cols[heightIdx], null) : undefined;
+      const age = ageIdx >= 0 ? toNumber(cols[ageIdx], null) : undefined;
+      const birthday = birthdayIdx >= 0 ? toStringVal(cols[birthdayIdx]) : undefined;
+      const times_picked = timesPickedIdx >= 0 ? (toNumber(cols[timesPickedIdx], 0) || 0) : undefined;
 
       const current = existingByName.get(name.toLowerCase());
       if (!current) {
         // Generate a new numeric id sequentially (table requires non-null id)
         maxId += 1;
-        toInsert.push({
-          id: maxId,
-          name,
-          official_rank,
-          ranking_group,
-          draft_value: 1, // ignore CSV Value column, default to 1 for new rikishi
-          wins,
-          losses,
-          absences,
-          weight_lbs,
-          height_inches,
-          age,
-          // Store as birth_date only; ignore birthday column if not in schema
-          birth_date: birthday,
-          times_picked
-        });
+        const newRow = { id: maxId, name, draft_value: 1 };
+        if (official_rank !== undefined) newRow.official_rank = official_rank;
+        if (ranking_group !== undefined) newRow.ranking_group = ranking_group;
+        if (wins !== undefined) newRow.wins = wins;
+        if (losses !== undefined) newRow.losses = losses;
+        if (absences !== undefined) newRow.absences = absences;
+        if (weight_lbs !== undefined) newRow.weight_lbs = weight_lbs;
+        if (height_inches !== undefined) newRow.height_inches = height_inches;
+        if (age !== undefined) newRow.age = age;
+        if (birthday !== undefined) newRow.birth_date = birthday; // Store as birth_date only
+        if (times_picked !== undefined) newRow.times_picked = times_picked;
+        toInsert.push(newRow);
       } else {
-        const update = { id: current.id };
+        // Include required non-null columns to avoid NOT NULL failures during upsert
+        const update = { id: current.id, name: current.name };
+        if (current.draft_value !== undefined) update.draft_value = current.draft_value;
         let changed = false;
-        const assignIfDiff = (key, val) => {
+        const assignIfPresentAndDiff = (key, val) => {
+          if (val === undefined) return;
           if ((current[key] ?? null) !== (val ?? null)) {
             update[key] = val;
             changed = true;
           }
         };
-        assignIfDiff('official_rank', official_rank);
-        assignIfDiff('ranking_group', ranking_group);
+        assignIfPresentAndDiff('official_rank', official_rank);
+        assignIfPresentAndDiff('ranking_group', ranking_group);
         // Do not overwrite draft_value from CSV; leave as is
-        assignIfDiff('wins', wins);
-        assignIfDiff('losses', losses);
-        assignIfDiff('absences', absences);
-        assignIfDiff('weight_lbs', weight_lbs);
-        assignIfDiff('height_inches', height_inches);
-        assignIfDiff('age', age);
+        assignIfPresentAndDiff('wins', wins);
+        assignIfPresentAndDiff('losses', losses);
+        assignIfPresentAndDiff('absences', absences);
+        assignIfPresentAndDiff('weight_lbs', weight_lbs);
+        assignIfPresentAndDiff('height_inches', height_inches);
+        assignIfPresentAndDiff('age', age);
         // Write birth_date only; ignore birthday
-        assignIfDiff('birth_date', birthday);
-        assignIfDiff('times_picked', times_picked);
+        assignIfPresentAndDiff('birth_date', birthday);
+        assignIfPresentAndDiff('times_picked', times_picked);
 
         if (changed) toUpdate.push(update);
       }
