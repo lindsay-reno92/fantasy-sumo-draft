@@ -22,5 +22,10 @@
       "src": "/((?!api|static).*)",
       "dest": "/static/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/admin/import-csv.js": {
+      "includeFiles": "newest_sumo_data.csv"
+    }
+  }
 } 
