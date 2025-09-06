@@ -124,8 +124,7 @@ module.exports = async (req, res) => {
           weight_lbs,
           height_inches,
           age,
-          // Write both if columns exist; DB will ignore unknown
-          birthday,
+          // Store as birth_date only; ignore birthday column if not in schema
           birth_date: birthday,
           times_picked
         });
@@ -147,8 +146,7 @@ module.exports = async (req, res) => {
         assignIfDiff('weight_lbs', weight_lbs);
         assignIfDiff('height_inches', height_inches);
         assignIfDiff('age', age);
-        // try both birthday fields
-        assignIfDiff('birthday', birthday);
+        // Write birth_date only; ignore birthday
         assignIfDiff('birth_date', birthday);
         assignIfDiff('times_picked', times_picked);
 
