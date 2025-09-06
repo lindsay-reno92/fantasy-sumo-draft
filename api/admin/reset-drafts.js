@@ -39,7 +39,8 @@ module.exports = async (req, res) => {
     // Reset all users' finalized flag and remaining points
     const { error: resetUsersErr } = await client
       .from('users')
-      .update({ is_draft_finalized: false, remaining_points: 50 });
+      .update({ is_draft_finalized: false, remaining_points: 50 })
+      .gt('id', 0); // Supabase requires a WHERE clause; this targets all rows
     if (resetUsersErr) throw resetUsersErr;
 
     return res.json({ success: true, message: 'All drafts reset' });
