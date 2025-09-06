@@ -179,7 +179,12 @@ module.exports = async (req, res) => {
         assignIfPresentAndDiff('birth_date', birthday);
         assignIfPresentAndDiff('times_picked', times_picked);
 
-        if (changed) toUpdate.push(update);
+        if (changed) {
+          // Ensure NOT NULL columns are present even if not changed, to guard against accidental inserts
+          if (update.official_rank === undefined) update.official_rank = current.official_rank ?? 'Unknown';
+          if (update.ranking_group === undefined) update.ranking_group = current.ranking_group ?? 'White';
+          toUpdate.push(update);
+        }
       }
     }
 
