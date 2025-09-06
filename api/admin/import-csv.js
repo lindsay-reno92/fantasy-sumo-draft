@@ -118,27 +118,36 @@ module.exports = async (req, res) => {
     for (const cols of rows) {
       const name = nameIdx >= 0 ? toStringVal(cols[nameIdx]) : null;
       if (!name) continue;
-      const official_rank = rankTextIdx >= 0 ? toStringVal(cols[rankTextIdx]) : undefined;
-      const ranking_group = groupIdx >= 0 ? toStringVal(cols[groupIdx]) : undefined;
+      const official_rank_raw = rankTextIdx >= 0 ? toStringVal(cols[rankTextIdx]) : undefined;
+      const ranking_group_raw = groupIdx >= 0 ? toStringVal(cols[groupIdx]) : undefined;
       const wins = winsIdx >= 0 ? (toNumber(cols[winsIdx], 0) || 0) : undefined;
       const losses = lossesIdx >= 0 ? (toNumber(cols[lossesIdx], 0) || 0) : undefined;
       const absences = absencesIdx >= 0 ? (toNumber(cols[absencesIdx], 0) || 0) : undefined;
-      const weight_lbs = weightIdx >= 0 ? toNumber(cols[weightIdx], null) : undefined;
-      const height_inches = heightIdx >= 0 ? toNumber(cols[heightIdx], null) : undefined;
-      const age = ageIdx >= 0 ? toNumber(cols[ageIdx], null) : undefined;
-      const birthday = birthdayIdx >= 0 ? toStringVal(cols[birthdayIdx]) : undefined;
+      const weight_lbs_raw = weightIdx >= 0 ? toNumber(cols[weightIdx], null) : undefined;
+      const height_inches_raw = heightIdx >= 0 ? toNumber(cols[heightIdx], null) : undefined;
+      const age_raw = ageIdx >= 0 ? toNumber(cols[ageIdx], null) : undefined;
+      const birthday_raw = birthdayIdx >= 0 ? toStringVal(cols[birthdayIdx]) : undefined;
       const times_picked = timesPickedIdx >= 0 ? (toNumber(cols[timesPickedIdx], 0) || 0) : undefined;
+
+      // Treat nulls as undefined for NOT NULL columns, so we don't write nulls
+      const official_rank = official_rank_raw == null ? undefined : official_rank_raw;
+      const ranking_group = ranking_group_raw == null ? undefined : ranking_group_raw;
+      const weight_lbs = weight_lbs_raw == null ? undefined : weight_lbs_raw;
+      const height_inches = height_inches_raw == null ? undefined : height_inches_raw;
+      const age = age_raw == null ? undefined : age_raw;
+      const birthday = birthday_raw == null ? undefined : birthday_raw;
 
       const current = existingByName.get(name.toLowerCase());
       if (!current) {
         // Generate a new numeric id sequentially (table requires non-null id)
         maxId += 1;
+        // Ensure NOT NULL columns are always provided on insert
         const newRow = { id: maxId, name, draft_value: 1 };
-        if (official_rank !== undefined) newRow.official_rank = official_rank;
-        if (ranking_group !== undefined) newRow.ranking_group = ranking_group;
-        if (wins !== undefined) newRow.wins = wins;
-        if (losses !== undefined) newRow.losses = losses;
-        if (absences !== undefined) newRow.absences = absences;
+        newRow.official_rank = (official_rank !== undefined ? official_rank : 'Unknown');
+        newRow.ranking_group = (ranking_group !== undefined ? ranking_group : 'White');
+        newRow.wins = (wins !== undefined ? wins : 0);
+        newRow.losses = (losses !== undefined ? losses : 0);
+        newRow.absences = (absences !== undefined ? absences : 0);
         if (weight_lbs !== undefined) newRow.weight_lbs = weight_lbs;
         if (height_inches !== undefined) newRow.height_inches = height_inches;
         if (age !== undefined) newRow.age = age;
