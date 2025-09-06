@@ -94,6 +94,18 @@ module.exports = async (req, res) => {
       (existing || []).map(r => [r.name.toLowerCase(), r])
     );
     let maxId = (existing || []).reduce((m, r) => Math.max(m, Number(r.id) || 0), 0);
+    // Fallback: ask DB for the max id directly (more reliable under RLS/filters)
+    try {
+      const { data: maxRow } = await client
+        .from('rikishi')
+        .select('id')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single();
+      if (maxRow && typeof maxRow.id === 'number') {
+        maxId = Math.max(maxId, maxRow.id);
+      }
+    } catch (_) {}
 
     const toInsert = [];
     const toUpdate = [];
@@ -173,9 +185,12 @@ module.exports = async (req, res) => {
     // Apply changes
     let inserted = 0, updated = 0;
     if (toInsert.length > 0) {
-      const { error: insErr } = await client.from('rikishi').insert(toInsert);
-      if (insErr) throw insErr;
-      inserted = toInsert.length;
+      // Insert one-by-one to avoid any column inference or RLS surprises
+      for (const row of toInsert) {
+        const { error: insErr } = await client.from('rikishi').insert(row);
+        if (insErr) throw insErr;
+        inserted += 1;
+      }
     }
     for (const chunkStart of Array.from({ length: toUpdate.length }, (_, i) => i).filter(i => i % 500 === 0)) {
       const chunk = toUpdate.slice(chunkStart, chunkStart + 500);
