@@ -93,6 +93,7 @@ module.exports = async (req, res) => {
     const existingByName = new Map(
       (existing || []).map(r => [r.name.toLowerCase(), r])
     );
+    let maxId = (existing || []).reduce((m, r) => Math.max(m, Number(r.id) || 0), 0);
 
     const toInsert = [];
     const toUpdate = [];
@@ -113,7 +114,10 @@ module.exports = async (req, res) => {
 
       const current = existingByName.get(name.toLowerCase());
       if (!current) {
+        // Generate a new numeric id sequentially (table requires non-null id)
+        maxId += 1;
         toInsert.push({
+          id: maxId,
           name,
           official_rank,
           ranking_group,
