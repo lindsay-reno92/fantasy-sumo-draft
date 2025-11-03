@@ -1,6 +1,7 @@
 const cookie = require('cookie');
 const { verifySession } = require('../_session-store');
 const { supabase, supabaseAdmin } = require('../../lib/supabase');
+const { DRAFT_BUDGET } = require('../../lib/config');
 
 function requireAdmin(req) {
   const cookies = cookie.parse(req.headers.cookie || '');
@@ -39,7 +40,7 @@ module.exports = async (req, res) => {
     // Reset all users' finalized flag and remaining points
     const { error: resetUsersErr } = await client
       .from('users')
-      .update({ is_draft_finalized: false, remaining_points: 50 })
+      .update({ is_draft_finalized: false, remaining_points: DRAFT_BUDGET })
       .gt('id', 0); // Supabase requires a WHERE clause; this targets all rows
     if (resetUsersErr) throw resetUsersErr;
 
