@@ -1,6 +1,6 @@
 const cookie = require('cookie');
 const { verifySession } = require('../_session-store');
-const { supabaseQueries } = require('../../lib/supabase');
+const { supabase, supabaseQueries } = require('../../lib/supabase');
 
 // Session helper
 function requireAuth(req) {
