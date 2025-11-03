@@ -127,7 +127,7 @@ module.exports = async (req, res) => {
           }),
           totalSpent,
           remainingPoints: DRAFT_BUDGET - totalSpent,
-          rikishiCount: rikishi.length,
+          rikishiCount: rikishi.length + (haterPick ? 1 : 0), // Include hater pick in count
           haterPick: haterPick,
           haterPickCost: haterPickCost
         };

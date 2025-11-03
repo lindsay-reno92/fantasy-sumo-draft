@@ -47,22 +47,32 @@ module.exports = async (req, res) => {
       // Get current draft status to check constraints
       const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
       
-      // Check if user already has white tier rikishi selected
-      const hasWhiteTier = draftStatus.selectedRikishi.some(r => r.ranking_group === 'White');
-      if (hasWhiteTier) {
-        const whiteTierRikishi = draftStatus.selectedRikishi.find(r => r.ranking_group === 'White');
+      // Check if user already has a hater pick (swapping is allowed)
+      const isSwappingHater = draftStatus.haterPick !== null;
+      
+      // Check if user has room for a hater pick (max 6 rikishi total including hater)
+      // If they already have a hater pick, they're swapping so selectedCount is already 6
+      // If they don't have one, check if they have space
+      const regularSelectionsCount = draftStatus.selectedCount - (isSwappingHater ? 1 : 0);
+      if (regularSelectionsCount >= 6 && !isSwappingHater) {
         return res.status(400).json({
-          error: `Cannot select hater pick when you have White tier rikishi! You have ${whiteTierRikishi.name} selected. Remove them first if you want to choose a hater pick instead.`
+          error: 'You already have 6 rikishi selected. Please deselect one regular pick before adding a hater pick.',
+          selectedCount: draftStatus.selectedCount
         });
       }
-
+      
       // Check if user has enough points for hater pick
-      const newTotal = draftStatus.totalSpent + haterCost;
+      // If swapping, we need to account for the old hater pick cost
+      const currentHaterCost = isSwappingHater ? draftStatus.haterPickCost : 0;
+      const netCostChange = haterCost - currentHaterCost;
+      const newTotal = draftStatus.totalSpent + netCostChange;
+      
       if (newTotal > DRAFT_BUDGET) {
         return res.status(400).json({
           error: 'Not enough points for hater pick',
           currentSpent: draftStatus.totalSpent,
           haterCost: haterCost,
+          netCostChange: netCostChange,
           wouldSpend: newTotal
         });
       }
@@ -72,6 +82,14 @@ module.exports = async (req, res) => {
 
       if (rikishiError || !rikishi) {
         return res.status(404).json({ error: 'Rikishi not found' });
+      }
+      
+      // Check if rikishi is already selected as a regular pick
+      const alreadyRegularPick = draftStatus.selectedRikishi.some(r => r.id === rikishiId);
+      if (alreadyRegularPick) {
+        return res.status(400).json({ 
+          error: 'This rikishi is already in your regular draft. Deselect them first if you want to make them your hater pick.' 
+        });
       }
 
       // Add hater pick

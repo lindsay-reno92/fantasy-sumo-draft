@@ -40,19 +40,27 @@ module.exports = async (req, res) => {
     // Check current draft status
     const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
     
-    // Check if user has reached max selection limit (6 rikishi)
+    // Check if user has reached max selection limit (6 rikishi total, including hater pick)
     if (draftStatus.selectedCount >= MAX_RIKISHI_SELECTIONS) {
       return res.status(400).json({ 
-        error: `Maximum selection limit reached. You can only select ${MAX_RIKISHI_SELECTIONS} rikishi.`,
+        error: `Maximum selection limit reached. You can only select ${MAX_RIKISHI_SELECTIONS} rikishi total (including hater pick).`,
         selectedCount: draftStatus.selectedCount,
-        maxSelections: MAX_RIKISHI_SELECTIONS
+        maxSelections: MAX_RIKISHI_SELECTIONS,
+        hasHaterPick: draftStatus.haterPick !== null
       });
     }
     
-    // Check if already selected
+    // Check if already selected as regular pick
     const alreadySelected = draftStatus.selectedRikishi.some(r => r.id === rikishiIdNum);
     if (alreadySelected) {
       return res.status(400).json({ error: 'Rikishi already selected' });
+    }
+    
+    // Check if already selected as hater pick
+    if (draftStatus.haterPick && draftStatus.haterPick.id === rikishiIdNum) {
+      return res.status(400).json({ 
+        error: 'This rikishi is already your hater pick. Remove the hater pick first if you want to select them as a regular pick.' 
+      });
     }
 
     // Get the rikishi to check its value

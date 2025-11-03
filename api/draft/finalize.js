@@ -1,6 +1,7 @@
 const cookie = require('cookie');
 const { verifySession, signSession } = require('../_session-store');
 const { supabaseQueries } = require('../../lib/supabase');
+const { DRAFT_BUDGET, MAX_RIKISHI_SELECTIONS } = require('../../lib/config');
 
 // Session helper
 function requireAuth(req) {
@@ -36,16 +37,20 @@ module.exports = async (req, res) => {
     // Get current draft status
     const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
 
-    // Validate draft completeness
-    if (draftStatus.selectedCount === 0) {
-      return res.status(400).json({ error: 'Cannot finalize empty draft' });
+    // Validate draft completeness - must have exactly 6 rikishi (including hater pick)
+    if (draftStatus.selectedCount !== MAX_RIKISHI_SELECTIONS) {
+      return res.status(400).json({ 
+        error: `You must select exactly ${MAX_RIKISHI_SELECTIONS} rikishi (including hater pick if any) before finalizing`,
+        selectedCount: draftStatus.selectedCount,
+        required: MAX_RIKISHI_SELECTIONS
+      });
     }
 
-    if (draftStatus.totalSpent > 50) {
+    if (draftStatus.totalSpent > DRAFT_BUDGET) {
       return res.status(400).json({ 
         error: 'Draft exceeds point limit',
         totalSpent: draftStatus.totalSpent,
-        limit: 50
+        limit: DRAFT_BUDGET
       });
     }
 
