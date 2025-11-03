@@ -1,7 +1,7 @@
 const cookie = require('cookie');
 const { verifySession } = require('../../_session-store');
 const { supabaseQueries } = require('../../../lib/supabase');
-const { DRAFT_BUDGET } = require('../../../lib/config');
+const { DRAFT_BUDGET, MAX_RIKISHI_SELECTIONS } = require('../../../lib/config');
 
 // Session helper
 function requireAuth(req) {
@@ -40,6 +40,15 @@ module.exports = async (req, res) => {
     // Check current draft status
     const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
     
+    // Check if user has reached max selection limit (6 rikishi)
+    if (draftStatus.selectedCount >= MAX_RIKISHI_SELECTIONS) {
+      return res.status(400).json({ 
+        error: `Maximum selection limit reached. You can only select ${MAX_RIKISHI_SELECTIONS} rikishi.`,
+        selectedCount: draftStatus.selectedCount,
+        maxSelections: MAX_RIKISHI_SELECTIONS
+      });
+    }
+    
     // Check if already selected
     const alreadySelected = draftStatus.selectedRikishi.some(r => r.id === rikishiIdNum);
     if (alreadySelected) {
@@ -53,14 +62,6 @@ module.exports = async (req, res) => {
       return res.status(404).json({ error: 'Rikishi not found' });
     }
 
-    // Check mutual exclusivity between hater pick and white tier
-    const hasHaterPick = draftStatus.haterPick !== null && draftStatus.haterPick !== undefined;
-    if (rikishi.ranking_group === 'White' && hasHaterPick) {
-      return res.status(400).json({
-        error: `Cannot select White tier rikishi when you have a hater pick! You chose ${draftStatus.haterPick.name} as your hater pick. Remove the hater pick first if you want to draft White tier rikishi instead.`
-      });
-    }
-
     // Check if user has enough points
     const newTotal = draftStatus.totalSpent + rikishi.draft_value;
     if (newTotal > DRAFT_BUDGET) {
@@ -68,7 +69,8 @@ module.exports = async (req, res) => {
         error: 'Not enough points',
         currentSpent: draftStatus.totalSpent,
         rikishiValue: rikishi.draft_value,
-        wouldSpend: newTotal
+        wouldSpend: newTotal,
+        budget: DRAFT_BUDGET
       });
     }
 
