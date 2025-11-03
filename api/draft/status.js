@@ -29,6 +29,20 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // Admin users don't have draft selections, return empty state
+    if (sessionData.isAdmin) {
+      return res.json({
+        sumoName: sessionData.sumoName,
+        selectedRikishi: [],
+        totalSpent: 0,
+        remainingPoints: 50,
+        selectedCount: 0,
+        isDraftFinalized: false,
+        haterPick: null,
+        haterPickCost: 0
+      });
+    }
+
     // Get draft status from Supabase
     const draftStatus = await supabaseQueries.getDraftStatus(sessionData.userId);
 
